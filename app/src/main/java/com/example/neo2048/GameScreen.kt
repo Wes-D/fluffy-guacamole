@@ -1,9 +1,5 @@
 package com.example.neo2048
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,9 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -23,17 +16,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.gestures.detectDragGestures
 import com.example.neo2048.ui.theme.Neo2048Theme
+import androidx.compose.animation.core.*
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.animateColorAsState
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @Composable
 fun GameScreen(
@@ -43,16 +39,40 @@ fun GameScreen(
     onReturnToMain: () -> Unit,
     onSwipe: (Direction) -> Unit
 ) {
+    var isGameOver by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var isProcessingSwipe by remember { mutableStateOf(false) }
+
+    LaunchedEffect(gameLogic) {
+        if (gameLogic.isGameOver()) {
+            isGameOver = true
+        }
+    }
+
     Column(
         modifier = Modifier
             .padding(16.dp)
             .fillMaxSize()
             .pointerInput(Unit) {
-                detectHorizontalDragGestures { _, dragAmount ->
-                    if (dragAmount > 0) onSwipe(Direction.RIGHT) else onSwipe(Direction.LEFT)
-                }
-                detectVerticalDragGestures { _, dragAmount ->
-                    if (dragAmount > 0) onSwipe(Direction.DOWN) else onSwipe(Direction.UP)
+                detectDragGestures { change, dragAmount ->
+                    if (isProcessingSwipe || isGameOver) return@detectDragGestures
+                    val (x, y) = dragAmount
+                    change.consume()
+
+                    scope.launch {
+                        isProcessingSwipe = true
+
+                        when {
+                            x > 50 -> onSwipe(Direction.RIGHT)
+                            x < -50 -> onSwipe(Direction.LEFT)
+                            y > 50 -> onSwipe(Direction.DOWN)
+                            y < -50 -> onSwipe(Direction.UP)
+                        }
+
+                        // Debounce: Ignore subsequent swipes for a short time
+                        delay(300)
+                        isProcessingSwipe = false
+                    }
                 }
             },
         verticalArrangement = Arrangement.Center,
@@ -82,7 +102,29 @@ fun GameScreen(
             }
         }
     }
+
+    if (isGameOver) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Game Over") },
+            text = { Text("No more moves are possible.") },
+            confirmButton = {
+                Button(onClick = {
+                    onRestart()
+                    isGameOver = false
+                }) {
+                    Text("Restart")
+                }
+            },
+            dismissButton = {
+                Button(onClick = onReturnToMain) {
+                    Text("Return to Main")
+                }
+            }
+        )
+    }
 }
+
 
 @Composable
 fun GameBoard(board: Array<Array<Int>>) {
@@ -99,15 +141,38 @@ fun GameBoard(board: Array<Array<Int>>) {
                 horizontalArrangement = Arrangement.Center
             ) {
                 for (cell in row) {
+                    var cellValue by remember { mutableStateOf(cell) }
+                    cellValue = cell // Update value to trigger animation
+                    val animatedValue by animateIntAsState(targetValue = cellValue)
+
+                    val backgroundColor by animateColorAsState(
+                        targetValue = when (animatedValue) {
+                            2 -> Color(0xFFEEE4DA)
+                            4 -> Color(0xFFEDE0C8)
+                            8 -> Color(0xFFF2B179)
+                            16 -> Color(0xFFF59563)
+                            32 -> Color(0xFFF67C5F)
+                            64 -> Color(0xFFF65E3B)
+                            128 -> Color(0xFFEDCF72)
+                            256 -> Color(0xFFEDCC61)
+                            512 -> Color(0xFFEDC850)
+                            1024 -> Color(0xFFEDC53F)
+                            2048 -> Color(0xFFEDC22E)
+                            else -> Color(0xFFCDC1B4)
+                        },
+                        animationSpec = tween(durationMillis = 300)
+                    )
+
                     Box(
                         modifier = Modifier
                             .padding(4.dp)
                             .size(80.dp)
-                            .background(Color.Gray),
+                            .background(backgroundColor)
+                            .animateContentSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (cell == 0) "" else cell.toString(),
+                            text = if (animatedValue == 0) "" else animatedValue.toString(),
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
