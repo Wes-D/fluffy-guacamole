@@ -28,6 +28,9 @@ import androidx.compose.animation.core.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColor
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.times
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
@@ -49,6 +52,8 @@ fun GameScreen(
         }
     }
 
+    val tiles by remember { derivedStateOf { gameLogic.getTiles() } }
+
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -63,10 +68,10 @@ fun GameScreen(
                         isProcessingSwipe = true
 
                         when {
-                            x > 100 -> onSwipe(Direction.RIGHT)
-                            x < -100 -> onSwipe(Direction.LEFT)
-                            y > 100 -> onSwipe(Direction.DOWN)
-                            y < -100 -> onSwipe(Direction.UP)
+                            x > 50 -> onSwipe(Direction.RIGHT)
+                            x < -50 -> onSwipe(Direction.LEFT)
+                            y > 50 -> onSwipe(Direction.DOWN)
+                            y < -50 -> onSwipe(Direction.UP)
                         }
 
                         // Debounce: Ignore subsequent swipes for a short time
@@ -86,12 +91,7 @@ fun GameScreen(
         )
 
         // Game Board
-        GameBoard(
-            board = gameLogic.board,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        )
+        GameBoard(tiles = tiles, gridSize = 4, modifier = Modifier.fillMaxWidth().weight(1f))
 
         // Directional Buttons
         DirectionalButtons(
@@ -168,7 +168,46 @@ fun DirectionalButtons(onMove: (Direction) -> Unit) {
     }
 }
 
+@Composable
+fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, modifier: Modifier = Modifier) {
+    // Define the colors for the board background and border
+    val boardBackgroundColor = Color(0xFFFFE0E0) // Light pink
+    val boardBorderColor = Color(0xFFFFC0C0) // Deeper shade of pink for the border
 
+    Box(
+        modifier = modifier
+            .padding(8.dp) // Outer padding to give space around the board
+            .border(4.dp, boardBorderColor) // Border with a deeper pink color
+            .background(boardBackgroundColor) // Light pink background
+            .aspectRatio(1f) // Maintain a square aspect ratio
+            .padding(0.dp), // No extra inner padding
+        contentAlignment = Alignment.Center
+    ) {
+        // Calculate tile size based on the available space in the box
+        val tileSpacing = 4.dp
+        val tileSize = (340.dp - (tileSpacing * (gridSize - 1))) / gridSize
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
+            for (i in 0 until gridSize) {
+                for (j in 0 until gridSize) {
+                    val tile = tiles.find { it.x == i && it.y == j }
+                    if (tile != null) {
+                        AnimatedTile(tile, gridSize, tileSize)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+/*
 @Composable
 fun GameBoard(board: Array<Array<Int>>, modifier: Modifier = Modifier) {
     Column(
@@ -221,7 +260,41 @@ fun GameBoard(board: Array<Array<Int>>, modifier: Modifier = Modifier) {
         }
     }
 }
+*/
+
+@Composable
+fun AnimatedTile(tile: Tile, gridSize: Int, tileSize: Dp) {
+    val xPos = remember { Animatable(tile.y.toFloat()) }
+    val yPos = remember { Animatable(tile.x.toFloat()) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(tile.x, tile.y) {
+        println("Animating tile to position: x=${tile.y}, y=${tile.x}")
+        scope.launch {
+            xPos.animateTo(tile.y.toFloat(), animationSpec = tween(durationMillis = 200))
+            yPos.animateTo(tile.x.toFloat(), animationSpec = tween(durationMillis = 200))
+        }
+    }
+
+    val tileSpacing = 4.dp // Adjust spacing between tiles
+    val offsetX = (xPos.value * (tileSize + tileSpacing))
+    val offsetY = (yPos.value * (tileSize + tileSpacing))
+
+    Box(
+        modifier = Modifier
+            .offset(offsetX, offsetY)
+            .size(tileSize) // Use dynamically calculated tile size
+            .background(Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = tile.value.toString(),
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
 
 
-enum class Direction { LEFT, RIGHT, UP, DOWN }
+
+
 

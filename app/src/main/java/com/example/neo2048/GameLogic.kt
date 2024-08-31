@@ -66,7 +66,6 @@ class GameLogic {
             board = board.copyOf()
             addNewTile()
         }
-        forceRecompose = !forceRecompose
     }
 
     fun moveUp() {
@@ -85,7 +84,6 @@ class GameLogic {
             board = board.copyOf()
             addNewTile()
         }
-        forceRecompose = !forceRecompose
     }
 
     fun moveDown() {
@@ -104,7 +102,6 @@ class GameLogic {
             board = board.copyOf()
             addNewTile()
         }
-        forceRecompose = !forceRecompose
     }
 
     // Combined compression and merging logic for left/up
@@ -160,7 +157,22 @@ class GameLogic {
         }
         return true
     }
+
+    fun getTiles(): List<Tile> {
+        val tiles = mutableListOf<Tile>()
+        for (i in 0 until boardSize) {
+            for (j in 0 until boardSize) {
+                val value = board[i][j]
+                if (value != 0) {
+                    tiles.add(Tile(value, i, j))
+                }
+            }
+        }
+        return tiles
+    }
 }
+
+
 
 private fun logBoardState(board: Array<Array<Int>>) {
     board.forEach { row ->
