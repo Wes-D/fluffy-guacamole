@@ -63,10 +63,10 @@ fun GameScreen(
                         isProcessingSwipe = true
 
                         when {
-                            x > 50 -> onSwipe(Direction.RIGHT)
-                            x < -50 -> onSwipe(Direction.LEFT)
-                            y > 50 -> onSwipe(Direction.DOWN)
-                            y < -50 -> onSwipe(Direction.UP)
+                            x > 100 -> onSwipe(Direction.RIGHT)
+                            x < -100 -> onSwipe(Direction.LEFT)
+                            y > 100 -> onSwipe(Direction.DOWN)
+                            y < -100 -> onSwipe(Direction.UP)
                         }
 
                         // Debounce: Ignore subsequent swipes for a short time
@@ -75,7 +75,7 @@ fun GameScreen(
                     }
                 }
             },
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Score Display
@@ -86,12 +86,23 @@ fun GameScreen(
         )
 
         // Game Board
-        GameBoard(gameLogic.board)
+        GameBoard(
+            board = gameLogic.board,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        )
+
+        // Directional Buttons
+        DirectionalButtons(
+            onMove = { direction -> onSwipe(direction) }
+        )
 
         // Buttons
-        Spacer(modifier = Modifier.height(16.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             Button(onClick = onRestart) {
@@ -125,11 +136,43 @@ fun GameScreen(
     }
 }
 
+@Composable
+fun DirectionalButtons(onMove: (Direction) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(onClick = { onMove(Direction.UP) }) {
+                Text("Up")
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(onClick = { onMove(Direction.LEFT) }) {
+                Text("Left")
+            }
+            Button(onClick = { onMove(Direction.DOWN) }) {
+                Text("Down")
+            }
+            Button(onClick = { onMove(Direction.RIGHT) }) {
+                Text("Right")
+            }
+        }
+    }
+}
+
 
 @Composable
-fun GameBoard(board: Array<Array<Int>>) {
+fun GameBoard(board: Array<Array<Int>>, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .padding(16.dp)
             .fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -141,9 +184,7 @@ fun GameBoard(board: Array<Array<Int>>) {
                 horizontalArrangement = Arrangement.Center
             ) {
                 for (cell in row) {
-                    var cellValue by remember { mutableStateOf(cell) }
-                    cellValue = cell // Update value to trigger animation
-                    val animatedValue by animateIntAsState(targetValue = cellValue)
+                    val animatedValue by animateIntAsState(targetValue = cell, label = "")
 
                     val backgroundColor by animateColorAsState(
                         targetValue = when (animatedValue) {
@@ -160,9 +201,8 @@ fun GameBoard(board: Array<Array<Int>>) {
                             2048 -> Color(0xFFEDC22E)
                             else -> Color(0xFFCDC1B4)
                         },
-                        animationSpec = tween(durationMillis = 300)
+                        animationSpec = tween(durationMillis = 300), label = ""
                     )
-
                     Box(
                         modifier = Modifier
                             .padding(4.dp)
@@ -182,4 +222,6 @@ fun GameBoard(board: Array<Array<Int>>) {
     }
 }
 
+
 enum class Direction { LEFT, RIGHT, UP, DOWN }
+

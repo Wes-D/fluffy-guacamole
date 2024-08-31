@@ -1,9 +1,17 @@
 package com.example.neo2048
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+
 class GameLogic {
-    var score = 0
+    var score by mutableIntStateOf(0)
     private val boardSize = 4
-    var board: Array<Array<Int>> = Array(boardSize) { Array(boardSize) { 0 } }
+    var board by mutableStateOf(Array(boardSize) { Array(boardSize) { 0 } })
+
+    // This is the dummy state to force a recomposition
+    var forceRecompose by mutableStateOf(false)
 
     init {
         resetGame()
@@ -33,102 +41,107 @@ class GameLogic {
     }
 
     fun moveLeft() {
-        val initialBoard = board.map { it.copyOf() }
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
 
         for (i in 0 until boardSize) {
-            val newRow = compressLeftOrUp(board[i])
-            mergeLeftOrUp(newRow)
-            board[i] = compressLeftOrUp(newRow)
+            board[i] = processRowLeftOrUp(board[i])
         }
+
         if (boardChanged(initialBoard, board)) {
+            logBoardState(board)
+            board = board.copyOf() // Create a new array instance to trigger recomposition
             addNewTile()
         }
     }
 
     fun moveRight() {
-        val initialBoard = board.map { it.copyOf() }
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
 
         for (i in 0 until boardSize) {
-            val newRow = compressRightOrDown(board[i])
-            mergeRightOrDown(newRow)
-            board[i] = compressRightOrDown(newRow)
+            board[i] = processRowRightOrDown(board[i])
         }
+
         if (boardChanged(initialBoard, board)) {
+            logBoardState(board)
+            board = board.copyOf()
             addNewTile()
         }
+        forceRecompose = !forceRecompose
     }
 
     fun moveUp() {
-        val initialBoard = board.map { it.copyOf() }
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
 
         for (j in 0 until boardSize) {
             val column = Array(boardSize) { i -> board[i][j] }
-            val newColumn = compressLeftOrUp(column)
-            mergeLeftOrUp(newColumn)
-            val finalColumn = compressLeftOrUp(newColumn)
+            val newColumn = processRowLeftOrUp(column)
             for (i in 0 until boardSize) {
-                board[i][j] = finalColumn[i]
+                board[i][j] = newColumn[i]
             }
         }
+
         if (boardChanged(initialBoard, board)) {
+            logBoardState(board)
+            board = board.copyOf()
             addNewTile()
         }
+        forceRecompose = !forceRecompose
     }
 
     fun moveDown() {
-        val initialBoard = board.map { it.copyOf() }
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
 
         for (j in 0 until boardSize) {
             val column = Array(boardSize) { i -> board[i][j] }
-            val newColumn = compressRightOrDown(column)
-            mergeRightOrDown(newColumn)
-            val finalColumn = compressRightOrDown(newColumn)
+            val newColumn = processRowRightOrDown(column)
             for (i in 0 until boardSize) {
-                board[i][j] = finalColumn[i]
+                board[i][j] = newColumn[i]
             }
         }
+
         if (boardChanged(initialBoard, board)) {
+            logBoardState(board)
+            board = board.copyOf()
             addNewTile()
         }
+        forceRecompose = !forceRecompose
     }
 
-
-    private fun compressLeftOrUp(row: Array<Int>): Array<Int> {
+    // Combined compression and merging logic for left/up
+    private fun processRowLeftOrUp(row: Array<Int>): Array<Int> {
         val newRow = row.filter { it != 0 }.toMutableList()
-        while (newRow.size < boardSize) {
-            newRow.add(0)
-        }
-        return newRow.toTypedArray()
-    }
-
-    private fun compressRightOrDown(row: Array<Int>): Array<Int> {
-        val newRow = row.filter { it != 0 }.toMutableList()
-        while (newRow.size < boardSize) {
-            newRow.add(0, 0)
-        }
-        return newRow.toTypedArray()
-    }
-
-    private fun mergeLeftOrUp(row: Array<Int>) {
-        for (i in 0 until boardSize - 1) {
-            if (row[i] != 0 && row[i] == row[i + 1]) {
-                row[i] *= 2
-                score += row[i]
-                row[i + 1] = 0
+        for (i in 0 until newRow.size - 1) {
+            if (newRow[i] == newRow[i + 1]) {
+                newRow[i] *= 2
+                score += newRow[i]
+                newRow[i + 1] = 0
             }
         }
+        val finalRow = newRow.filter { it != 0 }.toMutableList()
+        while (finalRow.size < boardSize) {
+            finalRow.add(0)
+        }
+        return finalRow.toTypedArray()
     }
 
-    private fun mergeRightOrDown(row: Array<Int>) {
-        for (i in boardSize - 1 downTo  1) {
-            if (row[i] != 0 && row[i] == row[i - 1]) {
-                row[i] *= 2
-                score += row[i]
-                row[i - 1] = 0
+    // Combined compression and merging logic for right/down
+    private fun processRowRightOrDown(row: Array<Int>): Array<Int> {
+        val newRow = row.filter { it != 0 }.toMutableList()
+        for (i in newRow.size - 1 downTo 1) {
+            if (newRow[i] == newRow[i - 1]) {
+                newRow[i] *= 2
+                score += newRow[i]
+                newRow[i - 1] = 0
             }
         }
+        val finalRow = newRow.filter { it != 0 }.toMutableList()
+        while (finalRow.size < boardSize) {
+            finalRow.add(0, 0)
+        }
+        return finalRow.toTypedArray()
     }
-    private fun boardChanged(initialBoard: List<Array<Int>>, newBoard: Array<Array<Int>>): Boolean {
+
+    private fun boardChanged(initialBoard: Array<Array<Int>>, newBoard: Array<Array<Int>>): Boolean {
         for (i in 0 until boardSize) {
             if (!initialBoard[i].contentEquals(newBoard[i])) {
                 return true
@@ -147,6 +160,13 @@ class GameLogic {
         }
         return true
     }
+}
+
+private fun logBoardState(board: Array<Array<Int>>) {
+    board.forEach { row ->
+        println(row.joinToString(" ") { it.toString() })
+    }
+    println("------")
 }
 
 
