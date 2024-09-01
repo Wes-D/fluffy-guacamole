@@ -89,7 +89,7 @@ fun GameScreen(
         )
 
         // Game Board
-        GameBoard(tiles = tiles, gridSize = 4, modifier = Modifier.fillMaxWidth().weight(1f))
+        GameBoard(tiles = tiles, gridSize = 4)
 
         // Directional Buttons
         DirectionalButtons(
@@ -190,9 +190,9 @@ fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, @SuppressLint("ModifierParam
                 .fillMaxSize()
         ) {
             for (tile in tiles) {
-                // Reverse the y-coordinate to correctly map the tiles to the screen
-                val actualX = tile.x
-                val actualY = gridSize - 1 - tile.y
+                // Ensure that the logical coordinates are mapped correctly
+                val actualX = tile.y
+                val actualY = tile.x // Flip the Y-axis to match the display
                 AnimatedTile(tile = tile, tileSize = tileSize, targetX = actualX, targetY = actualY)
             }
 
