@@ -1,5 +1,6 @@
 package com.example.neo2048
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,20 +15,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
-import com.example.neo2048.ui.theme.Neo2048Theme
 import androidx.compose.animation.core.*
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.animateColor
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.border
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.times
@@ -169,7 +163,7 @@ fun DirectionalButtons(onMove: (Direction) -> Unit) {
 }
 
 @Composable
-fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, modifier: Modifier = Modifier) {
+fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, @SuppressLint("ModifierParameter") modifier: Modifier = Modifier) {
     // Define the colors for the board background and border
     val boardBackgroundColor = Color(0xFFFFE0E0) // Light pink
     val boardBorderColor = Color(0xFFFFC0C0) // Deeper shade of pink for the border
@@ -195,7 +189,7 @@ fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, modifier: Modifier = Modifie
                 for (j in 0 until gridSize) {
                     val tile = tiles.find { it.x == i && it.y == j }
                     if (tile != null) {
-                        AnimatedTile(tile, gridSize, tileSize)
+                        AnimatedTile(tile, tileSize)
                     }
                 }
             }
@@ -203,87 +197,34 @@ fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, modifier: Modifier = Modifie
     }
 }
 
-
-
-
-
-/*
 @Composable
-fun GameBoard(board: Array<Array<Int>>, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .padding(16.dp)
-            .fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        for (row in board) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                for (cell in row) {
-                    val animatedValue by animateIntAsState(targetValue = cell, label = "")
-
-                    val backgroundColor by animateColorAsState(
-                        targetValue = when (animatedValue) {
-                            2 -> Color(0xFFEEE4DA)
-                            4 -> Color(0xFFEDE0C8)
-                            8 -> Color(0xFFF2B179)
-                            16 -> Color(0xFFF59563)
-                            32 -> Color(0xFFF67C5F)
-                            64 -> Color(0xFFF65E3B)
-                            128 -> Color(0xFFEDCF72)
-                            256 -> Color(0xFFEDCC61)
-                            512 -> Color(0xFFEDC850)
-                            1024 -> Color(0xFFEDC53F)
-                            2048 -> Color(0xFFEDC22E)
-                            else -> Color(0xFFCDC1B4)
-                        },
-                        animationSpec = tween(durationMillis = 300), label = ""
-                    )
-                    Box(
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .size(80.dp)
-                            .background(backgroundColor)
-                            .animateContentSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (animatedValue == 0) "" else animatedValue.toString(),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-*/
-
-@Composable
-fun AnimatedTile(tile: Tile, gridSize: Int, tileSize: Dp) {
+fun AnimatedTile(tile: Tile, tileSize: Dp) {
     val xPos = remember { Animatable(tile.y.toFloat()) }
     val yPos = remember { Animatable(tile.x.toFloat()) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(tile.x, tile.y) {
         println("Animating tile to position: x=${tile.y}, y=${tile.x}")
-        scope.launch {
-            xPos.animateTo(tile.y.toFloat(), animationSpec = tween(durationMillis = 200))
-            yPos.animateTo(tile.x.toFloat(), animationSpec = tween(durationMillis = 200))
-        }
+        // Start from the current position
+        xPos.snapTo(tile.y.toFloat())
+        yPos.snapTo(tile.x.toFloat())
+
+        // Animate the tile's x and y positions to their new target values
+        xPos.animateTo(tile.y.toFloat(), animationSpec = tween(durationMillis = 200))
+        yPos.animateTo(tile.x.toFloat(), animationSpec = tween(durationMillis = 200))
+
+        println("xPos: ${xPos.value}, yPos: ${yPos.value}")
     }
 
-    val tileSpacing = 4.dp // Adjust spacing between tiles
+    val tileSpacing = 4.dp
     val offsetX = (xPos.value * (tileSize + tileSpacing))
     val offsetY = (yPos.value * (tileSize + tileSpacing))
+
+    println("OffsetX: $offsetX, OffsetY: $offsetY")
 
     Box(
         modifier = Modifier
             .offset(offsetX, offsetY)
-            .size(tileSize) // Use dynamically calculated tile size
+            .size(tileSize)
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
@@ -293,6 +234,7 @@ fun AnimatedTile(tile: Tile, gridSize: Int, tileSize: Dp) {
         )
     }
 }
+
 
 
 

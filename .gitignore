@@ -20,3 +20,4 @@ local.properties
 *.hprof
 
 gradle/libs.versions.toml
+/app/src/main/res/

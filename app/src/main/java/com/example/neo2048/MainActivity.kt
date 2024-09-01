@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
             Neo2048Theme {
                 val navController = rememberNavController()
                 val gameLogic = remember { GameLogic() }
-                var score by remember { mutableStateOf(gameLogic.score) }
+                var score by remember { mutableIntStateOf(gameLogic.score) }
 
                 GameScreen(
                     gameLogic = gameLogic,
