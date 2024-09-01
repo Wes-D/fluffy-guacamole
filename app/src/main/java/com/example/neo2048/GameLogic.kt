@@ -8,10 +8,7 @@ import androidx.compose.runtime.setValue
 class GameLogic {
     var score by mutableIntStateOf(0)
     private val boardSize = 4
-    var board by mutableStateOf(Array(boardSize) { Array(boardSize) { 0 } })
-
-    // This is the dummy state to force a recomposition
-    var forceRecompose by mutableStateOf(false)
+    private var board by mutableStateOf(Array(boardSize) { Array(boardSize) { 0 } })
 
     init {
         resetGame()

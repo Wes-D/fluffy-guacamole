@@ -23,10 +23,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.times
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 
 @Composable
 fun GameScreen(
@@ -62,10 +66,10 @@ fun GameScreen(
                         isProcessingSwipe = true
 
                         when {
-                            x > 50 -> onSwipe(Direction.RIGHT)
-                            x < -50 -> onSwipe(Direction.LEFT)
-                            y > 50 -> onSwipe(Direction.DOWN)
-                            y < -50 -> onSwipe(Direction.UP)
+                            x > 20 -> onSwipe(Direction.RIGHT)
+                            x < -20 -> onSwipe(Direction.LEFT)
+                            y > 20 -> onSwipe(Direction.DOWN)
+                            y < -20 -> onSwipe(Direction.UP)
                         }
 
                         // Debounce: Ignore subsequent swipes for a short time
@@ -170,7 +174,7 @@ fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, @SuppressLint("ModifierParam
 
     Box(
         modifier = modifier
-            .padding(8.dp) // Outer padding to give space around the board
+            .padding(0.dp) // Outer padding to give space around the board
             .border(4.dp, boardBorderColor) // Border with a deeper pink color
             .background(boardBackgroundColor) // Light pink background
             .aspectRatio(1f) // Maintain a square aspect ratio
@@ -179,24 +183,23 @@ fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, @SuppressLint("ModifierParam
     ) {
         // Calculate tile size based on the available space in the box
         val tileSpacing = 4.dp
-        val tileSize = (340.dp - (tileSpacing * (gridSize - 1))) / gridSize
+        val tileSize = (380.dp - (tileSpacing * (gridSize - 1))) / gridSize
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            for (i in 0 until gridSize) {
-                for (j in 0 until gridSize) {
-                    val tile = tiles.find { it.x == i && it.y == j }
-                    if (tile != null) {
-                        AnimatedTile(tile, tileSize)
-                    }
-                }
+            for (tile in tiles) {
+                // Reverse the y-coordinate to correctly map the tiles to the screen
+                val actualX = tile.x
+                val actualY = gridSize - 1 - tile.y
+                AnimatedTile(tile = tile, tileSize = tileSize, targetX = actualX, targetY = actualY)
             }
+
         }
     }
 }
-
+/*
 @Composable
 fun AnimatedTile(tile: Tile, tileSize: Dp) {
     val xPos = remember { Animatable(tile.y.toFloat()) }
@@ -204,9 +207,6 @@ fun AnimatedTile(tile: Tile, tileSize: Dp) {
 
     LaunchedEffect(tile.x, tile.y) {
         println("Animating tile to position: x=${tile.y}, y=${tile.x}")
-        // Start from the current position
-        xPos.snapTo(tile.y.toFloat())
-        yPos.snapTo(tile.x.toFloat())
 
         // Animate the tile's x and y positions to their new target values
         xPos.animateTo(tile.y.toFloat(), animationSpec = tween(durationMillis = 200))
@@ -234,7 +234,47 @@ fun AnimatedTile(tile: Tile, tileSize: Dp) {
         )
     }
 }
+*/
 
+@Composable
+fun AnimatedTile(tile: Tile, tileSize: Dp, targetX: Int, targetY: Int) {
+    // Convert target positions from grid coordinates to pixel offsets
+    val targetOffsetX = with(LocalDensity.current) { (targetX * tileSize.toPx()).roundToInt() }
+    val targetOffsetY = with(LocalDensity.current) { (targetY * tileSize.toPx()).roundToInt() }
+
+    // Animatable for the offset position
+    val animatableX = remember { Animatable(targetOffsetX.toFloat()) }
+    val animatableY = remember { Animatable(targetOffsetY.toFloat()) }
+
+    // Launch the animations
+    LaunchedEffect(targetX, targetY) {
+        animatableX.animateTo(
+            targetOffsetX.toFloat(),
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+        )
+        animatableY.animateTo(
+            targetOffsetY.toFloat(),
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .size(tileSize) // Tile size
+            .offset { IntOffset(animatableX.value.roundToInt(), animatableY.value.roundToInt()) } // Apply the animated offset
+            .background(Color(0xFFFFA07A), shape = RoundedCornerShape(8.dp)) // Tile color and shape
+            .padding(4.dp) // Inner padding inside the tile
+            .border(2.dp, Color(0xFFFF6347), shape = RoundedCornerShape(8.dp)) // Border color (Tomato)
+    ) {
+        // Content inside the tile (e.g., a number)
+        Text(
+            text = tile.value.toString(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
 
 
 
