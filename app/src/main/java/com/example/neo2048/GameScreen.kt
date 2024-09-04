@@ -24,6 +24,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.times
@@ -50,7 +51,7 @@ fun GameScreen(
         }
     }
 
-    val tiles by remember { derivedStateOf { gameLogic.getTiles() } }
+    val tiles by remember { derivedStateOf { gameLogic.tiles } }
 
     Column(
         modifier = Modifier
@@ -135,6 +136,96 @@ fun GameScreen(
 }
 
 @Composable
+fun GameBoard(tiles: List<TileMovement>, gridSize: Int = 4, @SuppressLint("ModifierParameter") modifier: Modifier = Modifier) {
+
+    val boardBackgroundColor = Color(0xFFFFE0E0) // Color of the board
+    val boardBorderColor = Color(0xFFFFC0C0) // Color of the boarder
+
+    Box(
+        modifier = modifier
+            .padding(0.dp)
+            .border(4.dp, boardBorderColor)
+            .background(boardBackgroundColor)
+            .aspectRatio(1f)
+            .padding(0.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Calculate tile size and spacing based on available space
+        val tileSpacing = 4.dp
+        val tileSize = (380.dp - (tileSpacing * (gridSize - 1))) / gridSize
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            tiles.forEach { tile ->
+                AnimatedTile(
+                    tile = tile,
+                    tileSize = tileSize,
+                    startX = tile.oldY, // Start from oldX, oldY
+                    startY = tile.oldX,
+                    targetX = tile.newY, // Target to newX, newY
+                    targetY = tile.newX
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimatedTile(tile: TileMovement, tileSize: Dp, startX: Int, startY: Int, targetX: Int, targetY: Int) {
+    // Convert start and target positions to pixel offsets
+    val startOffsetX = with(LocalDensity.current) { (startX * tileSize.toPx()).roundToInt() }
+    val startOffsetY = with(LocalDensity.current) { (startY * tileSize.toPx()).roundToInt() }
+    val targetOffsetX = with(LocalDensity.current) { (targetX * tileSize.toPx()).roundToInt() }
+    val targetOffsetY = with(LocalDensity.current) { (targetY * tileSize.toPx()).roundToInt() }
+
+    // Animatable for the offset position
+    val animatableX = remember { Animatable(startOffsetX.toFloat()) }
+    val animatableY = remember { Animatable(startOffsetY.toFloat()) }
+
+    // Scale animation for new or merged tiles
+    val animatableScale = remember { Animatable(1f) }
+
+    // Launch the animations for movement
+    LaunchedEffect(targetX, targetY) {
+        animatableX.animateTo(
+            targetOffsetX.toFloat(),
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+        )
+        animatableY.animateTo(
+            targetOffsetY.toFloat(),
+            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+        )
+    }
+
+    // Launch the animation for scale (on merge or new tile)
+    LaunchedEffect(tile.isMerged, tile.isNew) {
+        if (tile.isMerged || tile.isNew) {
+            animatableScale.animateTo(1.2f, animationSpec = tween(100))
+            animatableScale.animateTo(1f, animationSpec = tween(100))
+        }
+    }
+
+    // Box to represent the tile with animation
+    Box(
+        modifier = Modifier
+            .size(tileSize)
+            .offset { IntOffset(animatableX.value.roundToInt(), animatableY.value.roundToInt()) } // Apply animated offset
+            .scale(animatableScale.value) // Apply animated scale
+            .background(Color(0xFFFFA07A), shape = RoundedCornerShape(8.dp)) // Tile color and shape
+            .padding(4.dp)
+            .border(2.dp, Color(0xFFFF6347), shape = RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = tile.value.toString(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+
+@Composable
 fun DirectionalButtons(onMove: (Direction) -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -165,118 +256,3 @@ fun DirectionalButtons(onMove: (Direction) -> Unit) {
         }
     }
 }
-
-@Composable
-fun GameBoard(tiles: List<Tile>, gridSize: Int = 4, @SuppressLint("ModifierParameter") modifier: Modifier = Modifier) {
-    // Define the colors for the board background and border
-    val boardBackgroundColor = Color(0xFFFFE0E0) // Light pink
-    val boardBorderColor = Color(0xFFFFC0C0) // Deeper shade of pink for the border
-
-    Box(
-        modifier = modifier
-            .padding(0.dp) // Outer padding to give space around the board
-            .border(4.dp, boardBorderColor) // Border with a deeper pink color
-            .background(boardBackgroundColor) // Light pink background
-            .aspectRatio(1f) // Maintain a square aspect ratio
-            .padding(0.dp), // No extra inner padding
-        contentAlignment = Alignment.Center
-    ) {
-        // Calculate tile size based on the available space in the box
-        val tileSpacing = 4.dp
-        val tileSize = (380.dp - (tileSpacing * (gridSize - 1))) / gridSize
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            for (tile in tiles) {
-                // Ensure that the logical coordinates are mapped correctly
-                val actualX = tile.y
-                val actualY = tile.x // Flip the Y-axis to match the display
-                AnimatedTile(tile = tile, tileSize = tileSize, targetX = actualX, targetY = actualY)
-            }
-
-        }
-    }
-}
-/*
-@Composable
-fun AnimatedTile(tile: Tile, tileSize: Dp) {
-    val xPos = remember { Animatable(tile.y.toFloat()) }
-    val yPos = remember { Animatable(tile.x.toFloat()) }
-
-    LaunchedEffect(tile.x, tile.y) {
-        println("Animating tile to position: x=${tile.y}, y=${tile.x}")
-
-        // Animate the tile's x and y positions to their new target values
-        xPos.animateTo(tile.y.toFloat(), animationSpec = tween(durationMillis = 200))
-        yPos.animateTo(tile.x.toFloat(), animationSpec = tween(durationMillis = 200))
-
-        println("xPos: ${xPos.value}, yPos: ${yPos.value}")
-    }
-
-    val tileSpacing = 4.dp
-    val offsetX = (xPos.value * (tileSize + tileSpacing))
-    val offsetY = (yPos.value * (tileSize + tileSpacing))
-
-    println("OffsetX: $offsetX, OffsetY: $offsetY")
-
-    Box(
-        modifier = Modifier
-            .offset(offsetX, offsetY)
-            .size(tileSize)
-            .background(Color.White),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = tile.value.toString(),
-            style = MaterialTheme.typography.bodyLarge
-        )
-    }
-}
-*/
-
-@Composable
-fun AnimatedTile(tile: Tile, tileSize: Dp, targetX: Int, targetY: Int) {
-    // Convert target positions from grid coordinates to pixel offsets
-    val targetOffsetX = with(LocalDensity.current) { (targetX * tileSize.toPx()).roundToInt() }
-    val targetOffsetY = with(LocalDensity.current) { (targetY * tileSize.toPx()).roundToInt() }
-
-    // Animatable for the offset position
-    val animatableX = remember { Animatable(targetOffsetX.toFloat()) }
-    val animatableY = remember { Animatable(targetOffsetY.toFloat()) }
-
-    // Launch the animations
-    LaunchedEffect(targetX, targetY) {
-        animatableX.animateTo(
-            targetOffsetX.toFloat(),
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-        )
-        animatableY.animateTo(
-            targetOffsetY.toFloat(),
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-        )
-    }
-
-    Box(
-        modifier = Modifier
-            .size(tileSize) // Tile size
-            .offset { IntOffset(animatableX.value.roundToInt(), animatableY.value.roundToInt()) } // Apply the animated offset
-            .background(Color(0xFFFFA07A), shape = RoundedCornerShape(8.dp)) // Tile color and shape
-            .padding(4.dp) // Inner padding inside the tile
-            .border(2.dp, Color(0xFFFF6347), shape = RoundedCornerShape(8.dp)) // Border color (Tomato)
-    ) {
-        // Content inside the tile (e.g., a number)
-        Text(
-            text = tile.value.toString(),
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
-            modifier = Modifier.align(Alignment.Center)
-        )
-    }
-}
-
-
-
-
-

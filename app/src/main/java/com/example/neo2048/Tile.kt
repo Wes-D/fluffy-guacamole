@@ -1,7 +1,13 @@
 package com.example.neo2048
 
-data class Tile(
+data class TileMovement(
+    val id: Int,
     val value: Int,
-    var x: Int,
-    var y: Int
+    val oldX: Int,
+    val oldY: Int,
+    val newX: Int,
+    val newY: Int,
+    val isNew: Boolean = false,
+    val isMerged: Boolean = false
 )
+
