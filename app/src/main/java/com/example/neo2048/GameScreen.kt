@@ -136,10 +136,13 @@ fun GameScreen(
 }
 
 @Composable
-fun GameBoard(tiles: List<TileMovement>, gridSize: Int = 4, @SuppressLint("ModifierParameter") modifier: Modifier = Modifier) {
-
+fun GameBoard(
+    tiles: List<TileMovement>,
+    gridSize: Int = 4,
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
+) {
     val boardBackgroundColor = Color(0xFFFFE0E0) // Color of the board
-    val boardBorderColor = Color(0xFFFFC0C0) // Color of the boarder
+    val boardBorderColor = Color(0xFFFFC0C0)     // Color of the border
 
     Box(
         modifier = modifier
@@ -158,24 +161,21 @@ fun GameBoard(tiles: List<TileMovement>, gridSize: Int = 4, @SuppressLint("Modif
             tiles.forEach { tile ->
                 AnimatedTile(
                     tile = tile,
-                    tileSize = tileSize,
-                    startX = tile.oldY, // Start from oldX, oldY
-                    startY = tile.oldX,
-                    targetX = tile.newY, // Target to newX, newY
-                    targetY = tile.newX
+                    tileSize = tileSize
                 )
             }
         }
     }
 }
 
+
 @Composable
-fun AnimatedTile(tile: TileMovement, tileSize: Dp, startX: Int, startY: Int, targetX: Int, targetY: Int) {
+fun AnimatedTile(tile: TileMovement, tileSize: Dp) {
     // Convert start and target positions to pixel offsets
-    val startOffsetX = with(LocalDensity.current) { (startX * tileSize.toPx()).roundToInt() }
-    val startOffsetY = with(LocalDensity.current) { (startY * tileSize.toPx()).roundToInt() }
-    val targetOffsetX = with(LocalDensity.current) { (targetX * tileSize.toPx()).roundToInt() }
-    val targetOffsetY = with(LocalDensity.current) { (targetY * tileSize.toPx()).roundToInt() }
+    val startOffsetX = with(LocalDensity.current) { (tile.oldY * tileSize.toPx()).roundToInt() }
+    val startOffsetY = with(LocalDensity.current) { (tile.oldX * tileSize.toPx()).roundToInt() }
+    val targetOffsetX = with(LocalDensity.current) { (tile.newY * tileSize.toPx()).roundToInt() }
+    val targetOffsetY = with(LocalDensity.current) { (tile.newX * tileSize.toPx()).roundToInt() }
 
     // Animatable for the offset position
     val animatableX = remember { Animatable(startOffsetX.toFloat()) }
@@ -184,33 +184,32 @@ fun AnimatedTile(tile: TileMovement, tileSize: Dp, startX: Int, startY: Int, tar
     // Scale animation for new or merged tiles
     val animatableScale = remember { Animatable(1f) }
 
-    // Launch the animations for movement
-    LaunchedEffect(targetX, targetY) {
-        animatableX.animateTo(
-            targetOffsetX.toFloat(),
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-        )
-        animatableY.animateTo(
-            targetOffsetY.toFloat(),
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-        )
-    }
+    // Single LaunchedEffect to control animation sequence
+    LaunchedEffect(targetOffsetX, targetOffsetY) {
+        // Step 1: Animate sliding to new position
+        animatableX.animateTo(targetOffsetX.toFloat(), tween(300, easing = FastOutSlowInEasing))
+        animatableY.animateTo(targetOffsetY.toFloat(), tween(300, easing = FastOutSlowInEasing))
 
-    // Launch the animation for scale (on merge or new tile)
-    LaunchedEffect(tile.isMerged, tile.isNew) {
-        if (tile.isMerged || tile.isNew) {
-            animatableScale.animateTo(1.2f, animationSpec = tween(100))
-            animatableScale.animateTo(1f, animationSpec = tween(100))
+        // Step 2: After sliding, trigger merge animation if necessary
+        if (tile.isMerged) {
+            animatableScale.animateTo(1.2f, tween(100))
+            animatableScale.animateTo(1f, tween(100))
+        }
+
+        // Step 3: Animate the appearance of new tiles (scale-up effect)
+        if (tile.isNew) {
+            animatableScale.animateTo(1.2f, tween(150))
+            animatableScale.animateTo(1f, tween(150))
         }
     }
 
-    // Box to represent the tile with animation
+    // Render the tile with animations applied
     Box(
         modifier = Modifier
             .size(tileSize)
-            .offset { IntOffset(animatableX.value.roundToInt(), animatableY.value.roundToInt()) } // Apply animated offset
-            .scale(animatableScale.value) // Apply animated scale
-            .background(Color(0xFFFFA07A), shape = RoundedCornerShape(8.dp)) // Tile color and shape
+            .offset { IntOffset(animatableX.value.roundToInt(), animatableY.value.roundToInt()) }
+            .scale(animatableScale.value)
+            .background(Color(0xFFFFA07A), shape = RoundedCornerShape(8.dp))
             .padding(4.dp)
             .border(2.dp, Color(0xFFFF6347), shape = RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center
@@ -218,12 +217,10 @@ fun AnimatedTile(tile: TileMovement, tileSize: Dp, startX: Int, startY: Int, tar
         Text(
             text = tile.value.toString(),
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
-            modifier = Modifier.align(Alignment.Center)
+            color = Color.White
         )
     }
 }
-
 
 @Composable
 fun DirectionalButtons(onMove: (Direction) -> Unit) {

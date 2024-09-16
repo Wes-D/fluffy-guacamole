@@ -4,14 +4,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class GameLogic {
     var score by mutableIntStateOf(0)
     private val boardSize = 4
     private var uniqueIdCounter = 0
     private var board by mutableStateOf(Array(boardSize) { Array(boardSize) { 0 } })
-    var tiles by mutableStateOf(emptyList<TileMovement>())
-        private set
+    var tiles by mutableStateOf<List<TileMovement>>(emptyList())
 
     init {
         resetGame()
@@ -78,201 +81,184 @@ class GameLogic {
     fun moveLeft() {
         val initialBoard = board.map { it.copyOf() }.toTypedArray()
         val movementInfo = mutableListOf<TileMovement>()
+        val newBoardRows = Array(boardSize) { Array(boardSize) { 0 } } // Changed to Array<Array<Int>>
 
         for (i in 0 until boardSize) {
-            val row = board[i] // Instead of a column, process each row
-            val processedResult = processRowLeft(row) // Use processRowLeft
+            val row = board[i]
+            val processedResult = processRowLeft(row)
 
-            // Update board and track movements
+            // Collect movements without updating the board yet
             for (j in 0 until boardSize) {
-                val oldValue = board[i][j]
                 val newValue = processedResult.newColumn[j]
-                board[i][j] = newValue
-
-                // Track only if movement or change happened
-                if (newValue != 0) {
-                    movementInfo.add(
-                        TileMovement(
-                            id = generateUniqueId(),
-                            value = newValue,
-                            oldX = i, // Row index stays the same
-                            oldY = j, // Previous position in the row
-                            newX = i, // Still in the same row
-                            newY = processedResult.positions[j], // New position in the row
-                            isNew = processedResult.isNew[j],
-                            isMerged = processedResult.isMerged[j]
-                        )
-                    )
-                }
-            }
-        }
-
-        if (boardChanged(initialBoard, board)) {
-            // Add new tile after the move and get its position
-            val newTilePos = addNewTile()
-
-            // If a new tile was added, add it to the movement info
-            if (newTilePos != null) {
-                movementInfo.add(
-                    TileMovement(
-                        id = generateUniqueId(),
-                        value = board[newTilePos.first][newTilePos.second],
-                        oldX = newTilePos.first, // New tile starts in its new position
-                        oldY = newTilePos.second,
-                        newX = newTilePos.first,
-                        newY = newTilePos.second,
-                        isNew = true,
-                        isMerged = false
-                    )
-                )
-            }
-
-            // Update tiles with movement information for animations
-            tiles = movementInfo
-            logBoardState(board)
-        }
-    }
-
-
-    fun moveRight() {
-        val initialBoard = board.map { it.copyOf() }.toTypedArray()
-        val movementInfo = mutableListOf<TileMovement>()
-
-        for (i in 0 until boardSize) {
-            val row = board[i] // Instead of a column, process each row
-            val processedResult = processRowRight(row) // Use processRowRight
-
-            // Update board and track movements
-            for (j in 0 until boardSize) {
-                val oldValue = board[i][j]
-                val newValue = processedResult.newColumn[j]
-                board[i][j] = newValue
-
-                // Track only if movement or change happened
-                if (newValue != 0) {
-                    movementInfo.add(
-                        TileMovement(
-                            id = generateUniqueId(),
-                            value = newValue,
-                            oldX = i, // Row index stays the same
-                            oldY = j, // Previous position in the row
-                            newX = i, // Still in the same row
-                            newY = processedResult.positions[j], // New position in the row
-                            isNew = processedResult.isNew[j],
-                            isMerged = processedResult.isMerged[j]
-                        )
-                    )
-                }
-            }
-        }
-
-        if (boardChanged(initialBoard, board)) {
-            // Add new tile after the move and get its position
-            val newTilePos = addNewTile()
-
-            // If a new tile was added, add it to the movement info
-            if (newTilePos != null) {
-                movementInfo.add(
-                    TileMovement(
-                        id = generateUniqueId(),
-                        value = board[newTilePos.first][newTilePos.second],
-                        oldX = newTilePos.first, // New tile starts in its new position
-                        oldY = newTilePos.second,
-                        newX = newTilePos.first,
-                        newY = newTilePos.second,
-                        isNew = true,
-                        isMerged = false
-                    )
-                )
-            }
-
-            // Update tiles with movement information for animations
-            tiles = movementInfo
-            logBoardState(board)
-        }
-    }
-
-
-    fun moveUp() {
-        val initialBoard = board.map { it.copyOf() }.toTypedArray()
-        val movementInfo = mutableListOf<TileMovement>()
-
-        for (j in 0 until boardSize) {
-            val column = Array(boardSize) { i -> board[i][j] }
-            val processedResult = processColumnUp(column)
-
-            // Update board and track movements
-            for (i in 0 until boardSize) {
-                val oldValue = board[i][j]
-                val newValue = processedResult.newColumn[i]
-                board[i][j] = newValue
+                newBoardRows[i][j] = newValue // Store in newBoardRows as Array<Array<Int>>
 
                 if (newValue != 0) {
-                        movementInfo.add(
-                            TileMovement(
-                                id = generateUniqueId(),
-                                value = newValue,
-                                oldX = i,
-                                oldY = j,
-                                newX = processedResult.positions[i],
-                                newY = j,
-                                isNew = processedResult.isNew[i],
-                                isMerged = processedResult.isMerged[i]
-                            )
-                        )
-                }
-            }
-        }
-
-        if (boardChanged(initialBoard, board)) {
-
-            // Add new tile after the move and get its position
-            val newTilePos = addNewTile()
-
-            if (newTilePos != null) {
-                movementInfo.add(
-                    TileMovement(
-                        id = generateUniqueId(),
-                        value = board[newTilePos.first][newTilePos.second],
-                        oldX = newTilePos.first, // New tile starts in its new position
-                        oldY = newTilePos.second,
-                        newX = newTilePos.first,
-                        newY = newTilePos.second,
-                        isNew = true,
-                        isMerged = false
-                    )
-                )
-            }
-            // Update tiles with movement information
-            tiles = movementInfo
-            logBoardState(board)
-        }
-    }
-
-    fun moveDown() {
-        val initialBoard = board.map { it.copyOf() }.toTypedArray()
-        val movementInfo = mutableListOf<TileMovement>()
-
-        for (j in 0 until boardSize) {
-            val column = Array(boardSize) { i -> board[i][j] }
-            val processedResult = processColumnDown(column)
-
-            // Update board and track movements
-            for (i in 0 until boardSize) {
-                val oldValue = board[i][j]
-                val newValue = processedResult.newColumn[i]
-                board[i][j] = newValue
-
-                if (newValue != 0) {
+                    val oldY = processedResult.positions[j] // Original column index
                     movementInfo.add(
                         TileMovement(
                             id = generateUniqueId(),
                             value = newValue,
                             oldX = i,
-                            oldY = j,
-                            newX = processedResult.positions[i],
+                            oldY = oldY,
+                            newX = i,
                             newY = j,
-                            isNew = processedResult.isNew[i],
+                            isNew = false,
+                            isMerged = processedResult.isMerged[j]
+                        )
+                    )
+                }
+            }
+        }
+
+        if (boardChanged(initialBoard, newBoardRows)) {
+            CoroutineScope(Dispatchers.Main).launch {
+                // Step 1: Trigger sliding animations
+                tiles = movementInfo
+
+                // Step 2: Delay to allow sliding animations to finish
+                delay(300)
+
+                // Step 3: Now apply merge values and update board
+                for (i in 0 until boardSize) {
+                    for (j in 0 until boardSize) {
+                        board[i][j] = newBoardRows[i][j]
+                    }
+                }
+
+                // Step 4: Trigger merge animations
+                tiles = movementInfo
+
+                // Step 5: Delay for merge animations to complete
+                delay(200)
+
+                // Step 6: Add new tile after animations
+                val newTilePos = addNewTile()
+                if (newTilePos != null) {
+                        val newTile = TileMovement(
+                            id = generateUniqueId(),
+                            value = board[newTilePos.first][newTilePos.second],
+                            oldX = newTilePos.first,
+                            oldY = newTilePos.second,
+                            newX = newTilePos.first,
+                            newY = newTilePos.second,
+                            isNew = true,
+                            isMerged = false
+                        )
+                    // Update tiles to include the new tile
+                    tiles = movementInfo + newTile
+                    logBoardState(board)
+                } else {
+                    // If no new tile was added, still update the tiles to trigger recomposition
+                    tiles = movementInfo.toList()
+                }
+            }
+        }
+    }
+
+    fun moveRight() {
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
+        val movementInfo = mutableListOf<TileMovement>()
+        val newBoardRows = Array(boardSize) { Array(boardSize) { 0 } }
+
+        for (i in 0 until boardSize) {
+            val row = board[i]
+            val processedResult = processRowRight(row)
+
+            // Collect movements without updating the board yet
+            for (j in 0 until boardSize) {
+                val newValue = processedResult.newColumn[j]
+                newBoardRows[i][j] = newValue
+
+                if (newValue != 0) {
+                    val oldY = processedResult.positions[j] // Original column index
+                    movementInfo.add(
+                        TileMovement(
+                            id = generateUniqueId(),
+                            value = newValue,
+                            oldX = i,
+                            oldY = oldY,
+                            newX = i,
+                            newY = j,
+                            isNew = false,
+                            isMerged = processedResult.isMerged[j]
+                        )
+                    )
+                }
+            }
+        }
+
+        if (boardChanged(initialBoard, newBoardRows)) {
+            CoroutineScope(Dispatchers.Main).launch {
+                // Trigger sliding animations
+                tiles = movementInfo
+
+                // Delay to allow sliding animations to finish
+                delay(300)
+
+                // Apply merge results and update board state
+                for (i in 0 until boardSize) {
+                    for (j in 0 until boardSize) {
+                        board[i][j] = newBoardRows[i][j]
+                    }
+                }
+
+                // Trigger merge animations
+                tiles = movementInfo
+
+                // Delay for merge animations to complete
+                delay(200)
+
+                // Add new tile after animations
+                val newTilePos = addNewTile()
+                if (newTilePos != null) {
+                    val newTile = TileMovement(
+                        id = generateUniqueId(),
+                        value = board[newTilePos.first][newTilePos.second],
+                        oldX = newTilePos.first,
+                        oldY = newTilePos.second,
+                        newX = newTilePos.first,
+                        newY = newTilePos.second,
+                        isNew = true,
+                        isMerged = false
+                    )
+                    // Update tiles to include the new tile
+                    tiles = movementInfo + newTile
+                    logBoardState(board)
+                } else {
+                    // If no new tile was added, still update the tiles to trigger recomposition
+                    tiles = movementInfo.toList()
+                }
+            }
+        }
+    }
+
+
+
+    fun moveUp() {
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
+        val movementInfo = mutableListOf<TileMovement>()
+        val newBoardColumns = Array(boardSize) { Array(boardSize) { 0 } }
+
+        for (j in 0 until boardSize) {
+            val column = Array(boardSize) { i -> board[i][j] }
+            val processedResult = processColumnUp(column)
+
+            // Collect movements without updating the board yet
+            for (i in 0 until boardSize) {
+                val newValue = processedResult.newColumn[i]
+                newBoardColumns[i][j] = newValue
+
+                if (newValue != 0) {
+                    val oldX = processedResult.positions[i] // Original row index
+                    movementInfo.add(
+                        TileMovement(
+                            id = generateUniqueId(),
+                            value = newValue,
+                            oldX = oldX,
+                            oldY = j,
+                            newX = i,
+                            newY = j,
+                            isNew = false,
                             isMerged = processedResult.isMerged[i]
                         )
                     )
@@ -280,175 +266,298 @@ class GameLogic {
             }
         }
 
-        if (boardChanged(initialBoard, board)) {
+        if (boardChanged(initialBoard, newBoardColumns)) {
+            CoroutineScope(Dispatchers.Main).launch {
+                // Trigger sliding animations
+                tiles = movementInfo
 
-            // Add new tile after the move and get its position
-            val newTilePos = addNewTile()
+                // Delay to allow sliding animations to finish
+                delay(300)
 
-            if (newTilePos != null) {
-                movementInfo.add(
-                    TileMovement(
+                // Apply merge results and update board state
+                for (i in 0 until boardSize) {
+                    for (j in 0 until boardSize) {
+                        board[i][j] = newBoardColumns[i][j]
+                    }
+                }
+
+                // Trigger merge animations
+                tiles = movementInfo
+
+                // Delay for merge animations to complete
+                delay(200)
+
+                // Add new tile after animations
+                val newTilePos = addNewTile()
+                if (newTilePos != null) {
+                    val newTile = TileMovement(
                         id = generateUniqueId(),
                         value = board[newTilePos.first][newTilePos.second],
-                        oldX = newTilePos.first, // New tile starts in its new position
+                        oldX = newTilePos.first,
                         oldY = newTilePos.second,
                         newX = newTilePos.first,
                         newY = newTilePos.second,
                         isNew = true,
                         isMerged = false
                     )
-                )
+                    // Update tiles to include the new tile
+                    tiles = movementInfo + newTile
+                    logBoardState(board)
+                } else {
+                    // If no new tile was added, still update the tiles to trigger recomposition
+                    tiles = movementInfo.toList()
+                }
             }
-            // Update tiles with movement information
-            tiles = movementInfo
-            logBoardState(board)
         }
     }
+
+    fun moveDown() {
+        val initialBoard = board.map { it.copyOf() }.toTypedArray()
+        val movementInfo = mutableListOf<TileMovement>()
+        val newBoardColumns = Array(boardSize) { Array(boardSize) { 0 } }
+
+        for (j in 0 until boardSize) {
+            val column = Array(boardSize) { i -> board[i][j] }
+            val processedResult = processColumnDown(column)
+
+            // Collect movements without updating the board yet
+            for (i in 0 until boardSize) {
+                val newValue = processedResult.newColumn[i]
+                newBoardColumns[i][j] = newValue
+
+                if (newValue != 0) {
+                    val oldX = processedResult.positions[i] // Original row index
+                    movementInfo.add(
+                        TileMovement(
+                            id = generateUniqueId(),
+                            value = newValue,
+                            oldX = oldX,
+                            oldY = j,
+                            newX = i,
+                            newY = j,
+                            isNew = false,
+                            isMerged = processedResult.isMerged[i]
+                        )
+                    )
+                }
+            }
+        }
+
+        if (boardChanged(initialBoard, newBoardColumns)) {
+            CoroutineScope(Dispatchers.Main).launch {
+                // Trigger sliding animations
+                tiles = movementInfo
+
+                // Delay to allow sliding animations to finish
+                delay(300)
+
+                // Apply merge results and update board state
+                for (i in 0 until boardSize) {
+                    for (j in 0 until boardSize) {
+                        board[i][j] = newBoardColumns[i][j]
+                    }
+                }
+
+                // Trigger merge animations
+                tiles = movementInfo
+
+                // Delay for merge animations to complete
+                delay(200)
+
+                // Add new tile after animations
+                val newTilePos = addNewTile()
+                if (newTilePos != null) {
+                    val newTile = TileMovement(
+                        id = generateUniqueId(),
+                        value = board[newTilePos.first][newTilePos.second],
+                        oldX = newTilePos.first,
+                        oldY = newTilePos.second,
+                        newX = newTilePos.first,
+                        newY = newTilePos.second,
+                        isNew = true,
+                        isMerged = false
+                    )
+                    // Update tiles to include the new tile
+                    tiles = movementInfo + newTile
+                    logBoardState(board)
+                } else {
+                    // If no new tile was added, still update the tiles to trigger recomposition
+                    tiles = movementInfo.toList()
+                }
+            }
+        }
+    }
+
 
     private fun processColumnUp(column: Array<Int>): ProcessedResult {
-        val newColumn = column.filter { it != 0 }.toMutableList() // Compress non-zero values
-        val positions = Array(column.size) { it } // Initialize positions to their original index
-        val isNew = Array(column.size) { false } // Initially, no tiles are new
-        val isMerged = Array(column.size) { false } // Initially, no tiles are merged
+        val size = column.size
+        val newColumn = IntArray(size) { 0 }
+        val positions = IntArray(size) { -1 }
+        val isMerged = BooleanArray(size) { false }
+        val isNew = BooleanArray(size) { false }
 
-        for (i in 0 until newColumn.size - 1) {
-            if (newColumn[i] == newColumn[i + 1]) {
-                newColumn[i] *= 2 // Merge tiles
-                newColumn[i + 1] = 0 // Mark the next tile as merged
-                isMerged[i] = true // Mark this tile as a merged tile
-                isMerged[i + 1] = true // Mark the merged tile
+        var lastValue = 0
+        var lastIndex = -1
+        var insertPos = 0
+
+        for (i in 0 until size) {
+            val currentValue = column[i]
+            if (currentValue != 0) {
+                if (lastValue == currentValue) {
+                    // Merge tiles
+                    val mergedValue = lastValue * 2
+                    newColumn[insertPos - 1] = mergedValue
+                    isMerged[insertPos - 1] = true
+                    positions[insertPos - 1] = lastIndex // Original index of the merged tile
+                    lastValue = 0
+                    lastIndex = -1
+                } else {
+                    // Move tile up
+                    newColumn[insertPos] = currentValue
+                    positions[insertPos] = i // Map new position to original index
+                    insertPos += 1
+                    lastValue = currentValue
+                    lastIndex = i
+                }
             }
         }
 
-        // Remove the zero values after merging
-        val finalColumn = newColumn.filter { it != 0 }.toMutableList()
-
-        // Update positions and fill the rest of the column with zeros
-        for (i in finalColumn.indices) {
-            positions[i] = i // Set the new position for the moved tiles
-        }
-        while (finalColumn.size < column.size) {
-            finalColumn.add(0)
-        }
-
         return ProcessedResult(
-            newColumn = finalColumn.toTypedArray(),
-            positions = positions,
-            isNew = isNew,
-            isMerged = isMerged
+            newColumn = newColumn.toTypedArray(),
+            positions = positions.toTypedArray(),
+            isNew = isNew.toTypedArray(),
+            isMerged = isMerged.toTypedArray()
         )
     }
+
 
     private fun processColumnDown(column: Array<Int>): ProcessedResult {
-        val newColumn = column.filter { it != 0 }.toMutableList() // Compress non-zero values
-        val positions = Array(column.size) { it } // Initialize positions to their original index
-        val isNew = Array(column.size) { false } // Initially, no tiles are new
-        val isMerged = Array(column.size) { false } // Initially, no tiles are merged
+        val size = column.size
+        val newColumn = IntArray(size) { 0 }
+        val positions = IntArray(size) { -1 }
+        val isMerged = BooleanArray(size) { false }
+        val isNew = BooleanArray(size) { false }
 
-        // Process the column from bottom to top (reverse order)
-        for (i in newColumn.size - 1 downTo 1) {
-            if (newColumn[i] == newColumn[i - 1]) {
-                newColumn[i] *= 2 // Merge tiles
-                newColumn[i - 1] = 0 // Mark the next tile as merged
-                isMerged[i] = true // Mark this tile as a merged tile
-                isMerged[i - 1] = true // Mark the merged tile
+        var lastValue = 0
+        var lastIndex = -1
+        var insertPos = size - 1
+
+        for (i in size - 1 downTo 0) {
+            val currentValue = column[i]
+            if (currentValue != 0) {
+                if (lastValue == currentValue) {
+                    // Merge tiles
+                    val mergedValue = lastValue * 2
+                    newColumn[insertPos + 1] = mergedValue
+                    isMerged[insertPos + 1] = true
+                    positions[insertPos + 1] = lastIndex // Original index of the merged tile
+                    lastValue = 0
+                    lastIndex = -1
+                } else {
+                    // Move tile down
+                    newColumn[insertPos] = currentValue
+                    positions[insertPos] = i // Map new position to original index
+                    insertPos -= 1
+                    lastValue = currentValue
+                    lastIndex = i
+                }
             }
         }
 
-        // Remove the zero values after merging
-        val finalColumn = newColumn.filter { it != 0 }.toMutableList()
-
-        // Update positions for the final column values, working bottom-to-top
-        for (i in finalColumn.indices) {
-            positions[finalColumn.size - 1 - i] = column.size - 1 - i // New position
-        }
-
-        // Fill the rest of the column with zeros
-        while (finalColumn.size < column.size) {
-            finalColumn.add(0, 0)
-        }
-
         return ProcessedResult(
-            newColumn = finalColumn.toTypedArray(),
-            positions = positions,
-            isNew = isNew,
-            isMerged = isMerged
+            newColumn = newColumn.toTypedArray(),
+            positions = positions.toTypedArray(),
+            isNew = isNew.toTypedArray(),
+            isMerged = isMerged.toTypedArray()
         )
     }
+
 
     private fun processRowLeft(row: Array<Int>): ProcessedResult {
-        val newRow = row.filter { it != 0 }.toMutableList() // Compress non-zero values
-        val positions = Array(row.size) { it } // Initialize positions to their original index
-        val isNew = Array(row.size) { false } // Initially, no tiles are new
-        val isMerged = Array(row.size) { false } // Initially, no tiles are merged
+        val size = row.size
+        val newRow = IntArray(size) { 0 }
+        val positions = IntArray(size) { -1 }
+        val isMerged = BooleanArray(size) { false }
+        val isNew = BooleanArray(size) { false }
 
-        // Process the row from left to right
-        for (i in 0 until newRow.size - 1) {
-            if (newRow[i] == newRow[i + 1]) {
-                newRow[i] *= 2 // Merge tiles
-                newRow[i + 1] = 0 // Mark the next tile as merged
-                isMerged[i] = true // Mark this tile as a merged tile
-                isMerged[i + 1] = true // Mark the merged tile
+        var lastValue = 0
+        var lastIndex = -1
+        var insertPos = 0
+
+        for (j in 0 until size) {
+            val currentValue = row[j]
+            if (currentValue != 0) {
+                if (lastValue == currentValue) {
+                    // Merge tiles
+                    val mergedValue = lastValue * 2
+                    newRow[insertPos - 1] = mergedValue
+                    isMerged[insertPos - 1] = true
+                    positions[insertPos - 1] = lastIndex // Original index of the merged tile
+                    lastValue = 0
+                    lastIndex = -1
+                } else {
+                    // Move tile to the left
+                    newRow[insertPos] = currentValue
+                    positions[insertPos] = j // Map new position to original index
+                    insertPos += 1
+                    lastValue = currentValue
+                    lastIndex = j
+                }
             }
         }
 
-        // Remove the zero values after merging
-        val finalRow = newRow.filter { it != 0 }.toMutableList()
-
-        // Update positions for the final row values
-        for (i in finalRow.indices) {
-            positions[i] = i // New position
-        }
-
-        // Fill the rest of the row with zeros
-        while (finalRow.size < row.size) {
-            finalRow.add(0)
-        }
+        // Fill the rest of newRow with zeros (already initialized with zeros)
 
         return ProcessedResult(
-            newColumn = finalRow.toTypedArray(),
-            positions = positions,
-            isNew = isNew,
-            isMerged = isMerged
+            newColumn = newRow.toTypedArray(),
+            positions = positions.toTypedArray(),
+            isNew = isNew.toTypedArray(),
+            isMerged = isMerged.toTypedArray()
         )
     }
+
 
     private fun processRowRight(row: Array<Int>): ProcessedResult {
-        val newRow = row.filter { it != 0 }.toMutableList() // Compress non-zero values
-        val positions = Array(row.size) { it } // Initialize positions to their original index
-        val isNew = Array(row.size) { false } // Initially, no tiles are new
-        val isMerged = Array(row.size) { false } // Initially, no tiles are merged
+        val size = row.size
+        val newRow = IntArray(size) { 0 }
+        val positions = IntArray(size) { -1 }
+        val isMerged = BooleanArray(size) { false }
+        val isNew = BooleanArray(size) { false }
 
-        // Process the row from right to left (reverse order)
-        for (i in newRow.size - 1 downTo 1) {
-            if (newRow[i] == newRow[i - 1]) {
-                newRow[i] *= 2 // Merge tiles
-                newRow[i - 1] = 0 // Mark the previous tile as merged
-                isMerged[i] = true // Mark this tile as a merged tile
-                isMerged[i - 1] = true // Mark the merged tile
+        var lastValue = 0
+        var lastIndex = -1
+        var insertPos = size - 1
+
+        for (j in size - 1 downTo 0) {
+            val currentValue = row[j]
+            if (currentValue != 0) {
+                if (lastValue == currentValue) {
+                    // Merge tiles
+                    val mergedValue = lastValue * 2
+                    newRow[insertPos + 1] = mergedValue
+                    isMerged[insertPos + 1] = true
+                    positions[insertPos + 1] = lastIndex // Original index of the merged tile
+                    lastValue = 0
+                    lastIndex = -1
+                } else {
+                    // Move tile to the right
+                    newRow[insertPos] = currentValue
+                    positions[insertPos] = j // Map new position to original index
+                    insertPos -= 1
+                    lastValue = currentValue
+                    lastIndex = j
+                }
             }
         }
 
-        // Remove the zero values after merging
-        val finalRow = newRow.filter { it != 0 }.toMutableList()
-
-        // Update positions for the final row values, working right-to-left
-        for (i in finalRow.indices) {
-            positions[row.size - 1 - i] = row.size - 1 - i // New position
-        }
-
-        // Fill the rest of the row with zeros
-        while (finalRow.size < row.size) {
-            finalRow.add(0, 0)
-        }
-
         return ProcessedResult(
-            newColumn = finalRow.toTypedArray(),
-            positions = positions,
-            isNew = isNew,
-            isMerged = isMerged
+            newColumn = newRow.toTypedArray(),
+            positions = positions.toTypedArray(),
+            isNew = isNew.toTypedArray(),
+            isMerged = isMerged.toTypedArray()
         )
     }
+
 
 
 
@@ -460,6 +569,7 @@ class GameLogic {
         }
         return false
     }
+
 
     fun isGameOver(): Boolean {
         for (i in 0 until boardSize) {
